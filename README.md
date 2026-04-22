@@ -6,3 +6,9 @@ Project to deploy software spanning across multiple domains. The framework was m
 
 # ping_endpoint_gateway_with_logging.txt
 This project was a form of redundancy for demonstrating product service reliability since the customer had specific issues connecting to the product through their ISP
+
+# rs_replacer_scrubbed.txt
+This project was to update all customer environment web services config files to include a new server node in a Microsoft PowerBI report farm. This execution targets a "server_list.txt" list created by additional supporting scripts
+
+# MakeList_scrubbed.txt
+Supporting rs_replacer_scrubbed.txt, this file runs through the domain, checking each servers file configuration and adding their server name to a list to be targeted by rs_replacer_scrubbed.txt
