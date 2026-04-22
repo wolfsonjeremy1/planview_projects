@@ -1,0 +1,107 @@
+# Default Vars
+[string]$PrmWebConfPath = 'SCRUBBED'
+[string]$OdataWebConfPath = 'SCRUBBED'
+[string]$RsDnsHostname = 'SCRUBBED'
+[string]$RsWhitelistValue = 'SCRUBBED'
+[string]$PrmDbConnPath = 'SCRUBBED'
+$TimeStamp = (Get-Date -Format 'yyyy_MM_dd_hh_mm_ss')
+
+function Set-XmlArray {
+    param (
+        [string] $filename = $(throw "filename is a required parameter"),
+        [string] $xpath = $(throw "xpath is a required parameter"),
+        [string] $element = $(throw "element is a required parameter"),
+        [string] $attribute_key = "",
+        [string] $attribute_value = "",
+        [string] $text = "",
+        [string] $searchkey = "",
+        [string] $searchvalue = ""
+    )
+    $XmlDoc = [xml](Get-Content $filename)
+    $nodes = $XmlDoc.SelectNodes("//*[@$searchkey]")
+    foreach ($node in $nodes) {
+        if ($node.$searchkey -eq $searchvalue) {
+            $xmlitem = $node
+        }
+    }
+    if ($xmlitem) {
+        $xmlItem.SetAttribute($attribute_key, $attribute_value)
+    } else {
+        $newelement = $XmlDoc.configuration.appSettings.add[0].clone()
+        $newelement.key = $searchvalue
+        $newelement.value = $attribute_value
+        $XmlDoc.configuration.appSettings.AppendChild($newelement)
+    }
+    $XmlSettings = New-Object System.Xml.XmlWriterSettings
+    $XmlSettings.Encoding = New-Object System.Text.UTF8Encoding $False
+    $XmlSettings.Indent = $true
+    $XmlWriter = [System.XML.XmlWriter]::Create($filename, $XmlSettings)
+    [xml]$XmlDoc.save($XmlWriter)
+    $XmlWriter.Flush()
+    $XmlWriter.Close()
+}
+
+
+try {
+    # get dbconnection.ini report_server_url values
+    $DbConnIni = Get-Content $PrmDbConnPath | where {$_ -match '^\s*report_server_url\=.*$'} | sort -Unique
+
+    if ($DbConnIni -and $DbConnIni -match $RsDnsHostname) {
+
+        #Backup the default web.config
+
+        New-item -Path 'F:\Util' -ItemType Directory -Force | Out-Null
+
+        copy-item -Path $PrmWebConfPath -Destination ('F:\Util\Web_RS_update_backup.config') -Force | Out-Null
+        #copy-item -Path $PrmWebConfPath -Destination ('F:\Util\Web_RS_update_backup'+$TimeStamp+'.config') -Force | Out-Null
+
+        # create or replace `rs_servers` value in PRM Webserver Web.config
+        $PrmSetParams = @{
+            filename        = $PrmWebConfPath
+            xpath           = "/configuration/appSettings"
+            element         = "add"
+            searchkey       = "key"
+            searchvalue     = "rs_servers"
+            attribute_key   = "value"
+            attribute_value = $RsWhitelistValue
+            verbose         = $true
+        }
+        Set-XmlArray @PrmSetParams | Out-Null
+
+
+        #Backup the Odata web.config
+
+        copy-item -Path $OdataWebConfPath -Destination ('F:\Util\Web_RS_update_backup_Odata.config') | Out-Null
+        #copy-item -Path $OdataWebConfPath -Destination ('F:\Util\Web_RS_update_backup_Odata_'+$TimeStamp+'.config') | Out-Null
+
+        # create or replace `Report_Servers` value in Odata Service Web.config
+        $OdataSetParams = @{
+            filename        = $OdataWebConfPath
+            xpath           = "/configuration/appSettings"
+            element         = "add"
+            searchkey       = "key"
+            searchvalue     = "Report_Servers"
+            attribute_key   = "value"
+            attribute_value = $RsWhitelistValue
+            verbose         = $true
+        }
+        Set-XmlArray @OdataSetParams | Out-Null
+        
+        Write-Output "SUCCESS - Updated PRM Webserver And Odata Service Web.config Files."
+
+    } else {
+        Write-Output "SKIPPED - dbconnection.ini report_server_url value does not match '${RsDnsHostname}'."
+    }
+}
+catch {
+    Write-Output ("ERROR - "+$_.Exception.Message)
+}
+finally {
+    $DbConnIni = $null
+    $PrmSetParams = $null
+    $OdataSetParams = $null
+    $PrmWebConfPath = $null
+    $OdataWebConfPath = $null
+    $RsDnsHostname = $null
+    $RsWhitelistValue = $null
+}
