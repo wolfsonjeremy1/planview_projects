@@ -1,0 +1,22 @@
+﻿$day = get-date -format "dddd MM_dd_yyyy"
+$new_folder = new-item -Name $day -path F:\Util\Novartis_Gateway_Ping\Logs\ -ItemType directory -ErrorAction SilentlyContinue
+$TestNetConnection = Test-NetConnection apigweu.novartis.com
+$LogsFolder = "F:\Util\Novartis_Gateway_Ping\Logs\$day"
+$MainFolder = "F:\Util\Novartis_Gateway_Ping\"
+
+Get-ChildItem -Path F:\Util\Novartis_Gateway_Ping\Logs\ | where {$_.LastWriteTime -le $(get-date).Adddays(-120)} | Remove-Item -recurse
+
+
+"Test to see if folder [$LogsFolder] exists"
+
+if (Test-Path -Path $LogsFolder) 
+{
+Write-Output "$day path exists, creating new ping log file inside of ($day)"
+}
+else
+{
+Write-Output "$day path does not exist, creating new folder called $day and new ping log file"
+}
+
+if ( $TestNetConnection.PingSucceeded -eq "True" ) {$TestNetConnection | Out-File -FilePath "$LogsFolder\$((Get-Date).ToString('MM-dd-yyyy_hh_mm'))_successful_connection.log" -Force}
+else {$TestNetConnection | Out-File -FilePath "$LogsFolder\$((Get-Date).ToString('MM-dd-yyyy_hh_mm'))_ERROR_IN_CONNECTION.log" -Force}
